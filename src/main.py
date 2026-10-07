@@ -2,9 +2,11 @@ import tkinter as tk
 from tkinter import scrolledtext
 import argparse
 import os
+import zipfile
 
 class Emulator:
     def __init__(self, root, vfs_path, script_path):
+        self.vfs = {}
         self.root = root
         self.root.title("VFS")
         self.root.geometry("800x600")
@@ -24,6 +26,28 @@ class Emulator:
 
         if self.script_path:
             self.root.after(100, self.run_script)
+
+        self.load_vfs()
+
+    def load_vfs(self):
+        """Загрузка VFS из ZIP-архива в оперативную память."""
+        self.vfs = {
+            "/": {"type": "directory"}
+        }
+        if not os.path.exists(self.vfs_path):
+            self.append_output(f"ZIP file '{self.vfs_path}' not found.\n")
+            return
+        with zipfile.ZipFile(self.vfs_path, 'r') as f:
+            for info in f.infolist():
+                path = "/" + info.filename.rstrip("/")
+                if info.is_dir():
+                    self.vfs[path] = {"type": "directory"}
+                else:
+                    with f.open(info) as f2:
+                        self.vfs[path] = {"type": "file", "content": f2.read()}
+        self.append_output("VFS successfully loaded into memory.\n"
+                           "----------------------------------------\n\n")
+
 
     def show_debug(self):
         """Отладочный вывод параметров конфигурации при запуске."""
@@ -195,7 +219,6 @@ Type 'help' for available commands.
         with open(self.script_path, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
-                
                 # Игнорируем пустые строки и комментарии (начинаются с #)
                 if not line or line.startswith("#"):
                     continue
