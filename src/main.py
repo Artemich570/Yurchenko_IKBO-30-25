@@ -1,8 +1,10 @@
 import tkinter as tk
 from tkinter import scrolledtext
+import argparse
+import os
 
 class Emulator:
-    def __init__(self, root):
+    def __init__(self, root, vfs_path, script_path):
         self.root = root
         self.root.title("VFS")
         self.root.geometry("800x600")
@@ -12,16 +14,32 @@ class Emulator:
         self.hostname = "localhost"
         self.command_history = []
         self.history_index = 0
+        self.vfs_path = vfs_path
+        self.script_path = script_path
         
         self.setup_ui()
         self.show_welcome_message()
+        self.show_debug()
         self.show_prompt()
+
+        if self.script_path:
+            self.root.after(100, self.run_script)
+
+    def show_debug(self):
+        """Отладочный вывод параметров конфигурации при запуске."""
+        debug_info = (
+            f"[DEBUG CONFIGURATION]\n"
+            f"VFS Physical Path: {self.vfs_path}\n"
+            f"Startup Script Path: {self.script_path if self.script_path else 'None'}\n"
+            f"----------------------------------------\n\n"
+        )
+        self.append_output(debug_info)
     
     def setup_ui(self):
         main_frame = tk.Frame(self.root, bg="black")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Текстовое поле для вывода
+        """Текстовое поле для вывода"""
         self.output_text = scrolledtext.ScrolledText(
             main_frame,
             wrap=tk.WORD,
@@ -33,24 +51,19 @@ class Emulator:
             state=tk.DISABLED
         )
         self.output_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # Фрейм для ввода команды
+        """Фрейм для ввода команды"""
         input_frame = tk.Frame(main_frame, bg="black")
         input_frame.pack(fill=tk.X, padx=5, pady=(0, 5))
-        
-        # Метка с приглашением
-        self.prompt_label = tk.Label(
-            input_frame,
+        """Метка с приглашением"""
+        self.prompt_label = tk.Label(input_frame,
             text="",
             bg="black",
             fg="#00ff00",
             font=("Courier New", 11)
         )
         self.prompt_label.pack(side=tk.LEFT)
-        
-        # Поле ввода команды
-        self.command_entry = tk.Entry(
-            input_frame,
+        """Поле ввода команды"""
+        self.command_entry = tk.Entry(input_frame,
             bg="black",
             fg="#00ff00",
             font=("Courier New", 11),
@@ -58,8 +71,9 @@ class Emulator:
             relief=tk.FLAT,
             bd=0
         )
-        self.command_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
-        
+        self.command_entry.pack(side=tk.LEFT, fill=tk.X, 
+                                expand=True, padx=(5, 0))
+
         self.command_entry.bind("<Return>", self.on_enter_pressed)
         self.command_entry.bind("<Up>", self.on_arrow_up)
         self.command_entry.bind("<Down>", self.on_arrow_down)
@@ -72,36 +86,34 @@ Type 'help' for available commands.
         self.append_output(welcome)
     
     def show_prompt(self):
-        # приглашение командной строки
+        """приглашение командной строки"""
         prompt = f"{self.username}@{self.hostname}:{self.current_directory}$ "
         self.prompt_label.config(text=prompt)
     
     def append_output(self, text):
-        #Добавить текст в выходное поле
+        """Добавить текст в выходное поле"""
         self.output_text.config(state=tk.NORMAL)
         self.output_text.insert(tk.END, text)
         self.output_text.see(tk.END)
         self.output_text.config(state=tk.DISABLED)
     
     def on_enter_pressed(self, event):
-        #Обработка нажатия Enter
-        command = self.command_entry.get().strip()
+        command = self.command_entry.get().strip() #Обработка нажатия Enter
         
-        # Выводим команду с приглашением
+        """Выводим команду с приглашением"""
         prompt = f"{self.username}@{self.hostname}:{self.current_directory}$ "
         self.append_output(prompt + command + "\n")
         
         self.command_entry.delete(0, tk.END)
         
         if command:
-            # Добавляем в историю
+            """Добавляем в историю"""
             self.command_history.append(command)
             self.history_index = len(self.command_history)
 
             self.process_command(command)
         
-        # Обновляем приглашение
-        self.show_prompt()
+        self.show_prompt() # Обновляем приглашение
     
     def process_command(self, command):
         command_ = command.split()[0]
@@ -124,19 +136,23 @@ Type 'help' for available commands.
             self.append_output(f"{command}: command not found\n")
     
     def on_arrow_up(self, event):
-        #Навигация по истории команд вверх
+        """Навигация по истории команд вверх"""
         if self.command_history and self.history_index > 0:
             self.history_index -= 1
             self.command_entry.delete(0, tk.END)
-            self.command_entry.insert(0, self.command_history[self.history_index])
+            self.command_entry.insert(0, 
+                                      self.command_history[self.history_index])
         return "break"
     
     def on_arrow_down(self, event):
-        #Навигация по истории команд вниз
-        if self.command_history and self.history_index < len(self.command_history) - 1:
+        """Навигация по истории команд вниз"""
+        if self.command_history and \
+            self.history_index < len(self.command_history) - 1:
+
             self.history_index += 1
             self.command_entry.delete(0, tk.END)
-            self.command_entry.insert(0, self.command_history[self.history_index])
+            self.command_entry.insert(0, 
+                                      self.command_history[self.history_index])
         elif self.history_index == len(self.command_history) - 1:
             self.history_index = len(self.command_history)
             self.command_entry.delete(0, tk.END)
@@ -168,11 +184,36 @@ Type 'help' for available commands.
             self.clear_screen()
 
     def cd_command(self, options, args):
-        self.append_output("Change the shell working directory.\n")
+        self.append_output("    Change the shell working directory.\n")
+
+    def run_script(self):
+        """Выполнение скрипта"""
+        if not os.path.exists(self.script_path):
+            self.append_output(f"Error: Startup script '{self.script_path}' not found.\n")
+            return
+        
+        with open(self.script_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                
+                # Игнорируем пустые строки и комментарии (начинаются с #)
+                if not line or line.startswith("#"):
+                    continue
+                
+                prompt = f"{self.username}@{self.hostname}:{self.current_directory}$ "
+                self.append_output(prompt + line + "\n")
+                
+                self.process_command(line)
+        self.show_prompt()
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--vfs", type=str, required=True, help="Path to VFS zip archive")
+    parser.add_argument("--script", type=str, default=None, help="Path to startup script")
+    args = parser.parse_args()
+
     root = tk.Tk()
-    app = Emulator(root)
+    app = Emulator(root, vfs_path=args.vfs, script_path=args.script)
     root.mainloop()
 
 if __name__ == "__main__":
