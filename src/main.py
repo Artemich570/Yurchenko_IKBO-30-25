@@ -52,18 +52,18 @@ class Emulator:
     def show_debug(self):
         """Отладочный вывод параметров конфигурации при запуске."""
         debug_info = (
-            f"[DEBUG CONFIGURATION]\n"
+            "[DEBUG CONFIGURATION]\n"
             f"VFS Physical Path: {self.vfs_path}\n"
-            f"Startup Script Path: {self.script_path if self.script_path else 'None'}\n"
-            f"----------------------------------------\n\n"
+            f"Startup Script Path: {self.script_path if self.script_path\
+                                     else 'None'}\n"
+            "----------------------------------------\n\n"
         )
         self.append_output(debug_info)
     
     def setup_ui(self):
+        """Настройка UI"""
         main_frame = tk.Frame(self.root, bg="black")
         main_frame.pack(fill=tk.BOTH, expand=True)
-        
-        """Текстовое поле для вывода"""
         self.output_text = scrolledtext.ScrolledText(
             main_frame,
             wrap=tk.WORD,
@@ -75,10 +75,10 @@ class Emulator:
             state=tk.DISABLED
         )
         self.output_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        """Фрейм для ввода команды"""
+
         input_frame = tk.Frame(main_frame, bg="black")
         input_frame.pack(fill=tk.X, padx=5, pady=(0, 5))
-        """Метка с приглашением"""
+
         self.prompt_label = tk.Label(input_frame,
             text="",
             bg="black",
@@ -86,7 +86,7 @@ class Emulator:
             font=("Courier New", 11)
         )
         self.prompt_label.pack(side=tk.LEFT)
-        """Поле ввода команды"""
+
         self.command_entry = tk.Entry(input_frame,
             bg="black",
             fg="#00ff00",
@@ -97,7 +97,6 @@ class Emulator:
         )
         self.command_entry.pack(side=tk.LEFT, fill=tk.X, 
                                 expand=True, padx=(5, 0))
-
         self.command_entry.bind("<Return>", self.on_enter_pressed)
         self.command_entry.bind("<Up>", self.on_arrow_up)
         self.command_entry.bind("<Down>", self.on_arrow_down)
@@ -122,24 +121,24 @@ Type 'help' for available commands.
         self.output_text.config(state=tk.DISABLED)
     
     def on_enter_pressed(self, event):
-        command = self.command_entry.get().strip() #Обработка нажатия Enter
+        """Обработка нажатия enter"""
+        command = self.command_entry.get().strip()
         
-        """Выводим команду с приглашением"""
         prompt = f"{self.username}@{self.hostname}:{self.current_directory}$ "
         self.append_output(prompt + command + "\n")
         
         self.command_entry.delete(0, tk.END)
         
         if command:
-            """Добавляем в историю"""
             self.command_history.append(command)
             self.history_index = len(self.command_history)
 
             self.process_command(command)
         
-        self.show_prompt() # Обновляем приглашение
+        self.show_prompt()
     
     def process_command(self, command):
+        """Обработка команды"""
         command_ = command.split()[0]
         options = []
         args = []
@@ -189,6 +188,7 @@ Type 'help' for available commands.
         self.show_prompt()
 
     def exit_command(self, options, args):
+        """Команда exit"""
         if len(options) > 0:
             self.append_output(f"{options[0]}: invalid option\n")
         elif len(args) > 0:
@@ -197,9 +197,11 @@ Type 'help' for available commands.
             self.root.destroy()
 
     def ls_command(self, options, args):
+        """Команда ls"""
         self.append_output(f"   List directory contents.\n")
 
     def clear_command(self, options, args):
+        """Команда clear"""
         if len(options) > 0:
             self.append_output(f"{options[0]}: invalid option\n")
         elif len(args) > 0:
@@ -208,31 +210,51 @@ Type 'help' for available commands.
             self.clear_screen()
 
     def cd_command(self, options, args):
+        """Команда cd"""
         self.append_output("    Change the shell working directory.\n")
 
     def run_script(self):
         """Выполнение скрипта"""
         if not os.path.exists(self.script_path):
-            self.append_output(f"Error: Startup script '{self.script_path}' not found.\n")
+            self.append_output(f"Error: Startup script \
+                               '{self.script_path}' not found.\n")
             return
         
         with open(self.script_path, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
-                # Игнорируем пустые строки и комментарии (начинаются с #)
                 if not line or line.startswith("#"):
                     continue
                 
-                prompt = f"{self.username}@{self.hostname}:{self.current_directory}$ "
+                prompt = \
+                f"{self.username}@{self.hostname}:{self.current_directory}$ "
                 self.append_output(prompt + line + "\n")
                 
                 self.process_command(line)
         self.show_prompt()
 
+def zip_folder(folder_path, output_path):
+        """Создание архива"""
+        with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for root, dirs, files in os.walk(folder_path):
+                for file in files:
+                    full = os.path.join(root, file)
+                    zf.write(full, os.path.relpath(full, folder_path))
+
+                for d in dirs:
+                    full_dir = os.path.join(root, d)
+                    if not os.listdir(full_dir):
+                        arcname = os.path.relpath(full_dir, folder_path) + "/"
+                        zf.writestr(arcname, "")
+
 def main():
+    zip_folder("vfs", "vfs.zip")
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--vfs", type=str, required=True, help="Path to VFS zip archive")
-    parser.add_argument("--script", type=str, default=None, help="Path to startup script")
+    parser.add_argument("--vfs", type=str, 
+                        required=True, help="Path to VFS zip archive")
+    parser.add_argument("--script", type=str, 
+                        default=None, help="Path to startup script")
     args = parser.parse_args()
 
     root = tk.Tk()
