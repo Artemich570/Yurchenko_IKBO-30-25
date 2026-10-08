@@ -155,8 +155,38 @@ Type 'help' for available commands.
             self.ls_command(options.copy(), args.copy())
         elif command_ == "cd":
             self.cd_command(options.copy(), args.copy())
+        elif command_ == "vfs-save":
+            self.vfs_save(options.copy(), args.copy())
+        elif command_ == "vfs-init":
+            self.vfs_init(options.copy(), args.copy())
         else:
-            self.append_output(f"{command}: command not found\n")
+            self.append_output(f"{command_}: command not found\n")
+
+    def vfs_save(self, options, args):
+        """Сохранение текущего состояния VFS."""
+        if len(args) != 1:
+            self.append_output("Usage: vfs-save <dest_zip_path>\n")
+            return
+            
+        dest_path = args[0]
+        with zipfile.ZipFile(dest_path, 'w', zipfile.ZIP_DEFLATED) as z:
+            for path, data in self.vfs.items():
+                if path == "/":
+                    continue
+                zip_name = path.lstrip('/')
+                
+                if data["type"] == "directory":
+                    z.writestr(zip_name + "/", "")
+                elif data["type"] == "file":
+                    z.writestr(zip_name, data["content"])
+                    
+        self.append_output(f"VFS state successfully saved to '{dest_path}'.\n")
+
+    def vfs_init(self, options, args):
+        """Сброс VFS к состоянию по умолчанию."""
+        zip_folder("vfs", "vfs.zip")
+                
+        self.append_output("VFS has been re-initialized to default.\n")
     
     def on_arrow_up(self, event):
         """Навигация по истории команд вверх"""
@@ -248,7 +278,8 @@ def zip_folder(folder_path, output_path):
                         zf.writestr(arcname, "")
 
 def main():
-    zip_folder("vfs", "vfs.zip")
+    if not os.path.exists("vfs.zip"):
+        zip_folder("vfs", "vfs.zip")
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--vfs", type=str, 
